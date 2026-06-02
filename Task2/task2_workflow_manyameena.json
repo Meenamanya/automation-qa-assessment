@@ -1,0 +1,307 @@
+{
+  "name": "HackerNews Morning Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hn-digest",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "b1855a52-d831-4429-8a64-074c2005eca3",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        16
+      ],
+      "webhookId": "hn-digest-webhook"
+    },
+    {
+      "parameters": {
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "0d3f18d3-f112-44c2-bcf5-820b62fb5e1c",
+      "name": "Fetch Top Story IDs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items - each item is one ID from the array\nconst allItems = $input.all();\n\n// Take first 5 and return them as items with id field\nreturn allItems.slice(0, 5).map(item => ({\n  json: { id: Object.values(item.json)[0] || item.json }\n}));"
+      },
+      "id": "dda8cf45-d423-4fdc-b412-c81f789855c2",
+      "name": "Filter Top 5 IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://hacker-news.firebaseio.com/v0/item/{{$json.id}}.json",
+        "options": {}
+      },
+      "id": "f0a59696-a9f6-4f9b-b0a8-689558f53820",
+      "name": "Enrich: Fetch Story Detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        480
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-score",
+              "leftValue": "={{$json.score}}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0a37a0ac-475d-4e50-a88f-3db778372131",
+      "name": "IF Score > 100",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        208,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst lines = items.map((item, i) => {\n  const d = item.json;\n  const title = d.title || 'No title';\n  const score = d.score || 0;\n  const url = d.url ? d.url : `https://news.ycombinator.com/item?id=${d.id}`;\n  const comments = d.descendants || 0;\n  return `**${i + 1}. [${title}](${url})**\\n   Score: ${score} pts | Comments: ${comments}`;\n});\n\nconst timestamp = new Date().toUTCString();\n\nconst payload = {\n  content: null,\n  embeds: [\n    {\n      title: 'HackerNews Morning Digest',\n      description: lines.join('\\n\\n'),\n      color: 16744272,\n      footer: {\n        text: `Generated at ${timestamp}`\n      }\n    }\n  ]\n};\n\nreturn [{ json: payload }];"
+      },
+      "id": "d2396fd7-02fe-4171-95c0-71115e842759",
+      "name": "Build Discord Embed (High Score)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1510936747578622024/2ltzA2IrtyGXADW8dtx-ikUSVPAVR-Nqttm6f1uCoVdNhR-mNArVBcbpxKmghIY7IIot",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json)}}",
+        "options": {}
+      },
+      "id": "9a86d393-d196-4749-ad60-53e0a73c5486",
+      "name": "Send to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        688,
+        368
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst lowScoreStories = items.map(item => ({\n  id: item.json.id,\n  title: item.json.title,\n  score: item.json.score\n}));\nreturn [{ json: { status: 'skipped', reason: 'score <= 100', stories: lowScoreStories } }];"
+      },
+      "id": "dfe53a34-00b3-400e-bf6f-8fb325690f48",
+      "name": "Log Low-Score Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        544
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "967e4c13-4290-4e19-b26c-af2370990d56",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nconst payload = {\n  content: null,\n  embeds: [\n    {\n      title: 'Workflow Error: HackerNews Digest',\n      description: `**Error:** ${error.error?.message || 'Unknown error'}\\n**Node:** ${error.execution?.lastNodeExecuted || 'Unknown node'}\\n**Time:** ${new Date().toUTCString()}`,\n      color: 15548997\n    }\n  ]\n};\nreturn [{ json: payload }];"
+      },
+      "id": "c6a86178-36a9-4dea-b062-7a85df85a3ad",
+      "name": "Format Error Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1510936747578622024/2ltzA2IrtyGXADW8dtx-ikUSVPAVR-Nqttm6f1uCoVdNhR-mNArVBcbpxKmghIY7IIot",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json)}}",
+        "options": {}
+      },
+      "id": "43059712-92d8-431a-b1ea-041323bdc7b7",
+      "name": "Send Error to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Top Story IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Top Story IDs": {
+      "main": [
+        [
+          {
+            "node": "Filter Top 5 IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Filter Top 5 IDs": {
+      "main": [
+        [
+          {
+            "node": "Enrich: Fetch Story Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich: Fetch Story Detail": {
+      "main": [
+        [
+          {
+            "node": "IF Score > 100",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Score > 100": {
+      "main": [
+        [
+          {
+            "node": "Build Discord Embed (High Score)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Low-Score Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Discord Embed (High Score)": {
+      "main": [
+        [
+          {
+            "node": "Send to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Error to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2718594c-c4aa-44cf-ae32-d8cecdf95552",
+  "meta": {
+    "instanceId": "41f0df371db225d8147c27912dd227698044d5d2238d2fac9960894bef5cdade"
+  },
+  "id": "74t28euKD5xL2d7r",
+  "tags": []
+}
