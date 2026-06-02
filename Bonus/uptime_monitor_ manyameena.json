@@ -77,7 +77,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://discord.com/api/webhooks/1510936747578622024/2ltzA2IrtyGXADW8dtx-ikUSVPAVR-Nqttm6f1uCoVdNhR-mNArVBcbpxKmghIY7IIot",
+        "url": ""https://discord.com/api/webhooks/REDACTED"",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
